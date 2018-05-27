@@ -15,6 +15,7 @@ var {EventEmitter} = require('events');
 var assign = require('object-assign');
 var nullthrows = require('nullthrows').default;
 var guid = require('../utils/guid');
+var serializePropsForCopy = require('../utils/serializePropsForCopy');
 var getIn = require('./getIn');
 
 import type {RendererID, DataType, OpaqueNodeHandle, NativeType, Helpers} from '../backend/types';
@@ -155,6 +156,7 @@ class Agent extends EventEmitter {
     bridge.on('setProps', this._setProps.bind(this));
     bridge.on('setContext', this._setContext.bind(this));
     bridge.on('makeGlobal', this._makeGlobal.bind(this));
+    bridge.on('getPropsForCopy', this._getPropsForCopy.bind(this));
     bridge.on('highlight', id => this.highlight(id));
     bridge.on('highlightMany', id => this.highlightMany(id));
     bridge.on('hideHighlight', () => this.emit('hideHighlight'));
@@ -223,6 +225,7 @@ class Agent extends EventEmitter {
     this.on('isRecording', isRecording => bridge.send('isRecording', isRecording));
     this.on('storeSnapshot', (data) => bridge.send('storeSnapshot', data));
     this.on('clearSnapshots', () => bridge.send('clearSnapshots'));
+    this.on('sendPropsForCopy', value => bridge.send('sendPropsForCopy', value));
   }
 
   scrollToNode(id: ElementID): void {
@@ -441,6 +444,16 @@ class Agent extends EventEmitter {
     this.renderers.delete(id);
     this.emit('unmount', id);
     this.idsByInternalInstances.delete(component);
+  }
+
+  _getPropsForCopy(id: ElementID) {
+    var data = this.elementData.get(id);
+    if (!data || !data.props) {
+      return;
+    } else {
+      var result = serializePropsForCopy(data.props);
+      this.emit('sendPropsForCopy', result);
+    }
   }
 
   _onScroll() {
